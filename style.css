@@ -328,3 +328,25 @@ dialog.foglio::backdrop { background: rgba(8, 4, 30, .45); -webkit-backdrop-filt
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
   .blob { animation: none; }
 }
+
+/* ============ Stampa / PDF ============ */
+#stampa { display: none; }
+@media print {
+  @page { margin: 16mm 14mm; }
+  body.in-stampa { background: #fff !important; color: #1a1a2e; padding: 0; }
+  body.in-stampa > *:not(#stampa) { display: none !important; }
+  body.in-stampa #stampa { display: block; font: 11pt/1.45 var(--f-body); color: #1a1a2e; }
+  #stampa header { display: flex; justify-content: space-between; font-size: 9pt; color: #666; border-bottom: 2px solid #6a4cff; padding-bottom: 6px; margin-bottom: 18px; }
+  #stampa h1 { font: 800 22pt/1.1 var(--f-display); margin: 0 0 4px; letter-spacing: -.02em; }
+  #stampa .sotto { color: #555; margin: 0 0 16px; }
+  #stampa .numeri { display: flex; gap: 10px; margin: 0 0 18px; }
+  #stampa .numeri div { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; }
+  #stampa .numeri b { display: block; font: 800 14pt var(--f-display); }
+  #stampa .numeri span { font-size: 9pt; color: #666; }
+  #stampa h2 { font: 700 12pt var(--f-display); margin: 18px 0 6px; text-transform: none; letter-spacing: 0; color: #1a1a2e; }
+  #stampa table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  #stampa th { text-align: left; background: #f0edff; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  #stampa td { padding: 6px 8px; border-bottom: 1px solid #e6e6e6; }
+  #stampa tr { break-inside: avoid; }
+  #stampa .testo { white-space: pre-wrap; }
+}

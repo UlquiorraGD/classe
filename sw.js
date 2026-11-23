@@ -1,6 +1,6 @@
 /* Rende l'app usabile anche senza rete. Cambiare VERSIONE a ogni aggiornamento. */
-const VERSIONE = 'classe-v4';
-const FILE = ['./', 'index.html', 'style.css', 'dati.js', 'app.js', 'classe.js', 'agenda.js', 'manifest.webmanifest', 'icona.svg', 'icona-192.png', 'icona-512.png'];
+const VERSIONE = 'classe-v5';
+const FILE = ['./', 'index.html', 'style.css', 'dati.js', 'app.js', 'classe.js', 'agenda.js', 'esporta.js', 'manifest.webmanifest', 'icona.svg', 'icona-192.png', 'icona-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSIONE).then(c => c.addAll(FILE)).then(() => self.skipWaiting()));

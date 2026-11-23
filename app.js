@@ -119,7 +119,8 @@ function vRaccolta(r) {
     <div class="glass card">${r.spese.length ? `<table class="tabella"><tbody>${spese}<tr class="tot"><td>Totale</td><td>${euro(sp)}</td></tr></tbody></table>` : '<p class="muted">Ancora nessuna spesa. Quando compri qualcosa, segnala qui: il resoconto si fa da solo.</p>'}
       <div class="fila"><button class="btn vetro" onclick="A.formSpesa('${r.id}')">${ic('scontrino', 'sm')}Aggiungi spesa</button>
       <button class="btn c-sun" onclick="A.msg('resoconto','${r.id}')">${ic('manda', 'sm')}Resoconto</button></div></div>
-    <div class="fila"><button class="btn vetro" onclick="A.chiudi('raccolte','${r.id}')">${ic(r.chiusa ? 'su' : 'lucchetto', 'sm')}${r.chiusa ? 'Riapri' : 'Chiudi'} raccolta</button>
+    <div class="fila"><button class="btn vetro" onclick="A.chiudi('raccolte','${r.id}')">${ic(r.chiusa ? 'su' : 'lucchetto', 'sm')}${r.chiusa ? 'Riapri' : 'Chiudi'}</button>
+      <button class="btn vetro" onclick="A.esportaVoce('raccolte','${r.id}')">${ic('giu', 'sm')}Esporta</button>
       <button class="btn rosso" onclick="A.elimina('raccolte','${r.id}','cassa')">${ic('cestino', 'sm')}Elimina</button></div>`;
 }
 
@@ -164,6 +165,7 @@ function vAdesione(a) {
     ${titoloSez('Risposte', `<span class="tenue">${tot - m} su ${tot}</span>`)}
     <div class="glass lista">${righe}</div>
     <div class="fila"><button class="btn vetro" onclick="A.chiudi('adesioni','${a.id}')">${ic(a.chiusa ? 'su' : 'lucchetto', 'sm')}${a.chiusa ? 'Riapri' : 'Chiudi'}</button>
+      <button class="btn vetro" onclick="A.esportaVoce('adesioni','${a.id}')">${ic('giu', 'sm')}Esporta</button>
       <button class="btn rosso" onclick="A.elimina('adesioni','${a.id}','adesioni')">${ic('cestino', 'sm')}Elimina</button></div>`;
 }
 
@@ -287,6 +289,7 @@ const A = {
       <textarea class="messaggio" id="testo-msg" rows="11" aria-label="Testo del messaggio">${esc(testoPronto || TESTI[tipo](x))}</textarea>
       <div class="fila"><button class="btn ${colore}" onclick="manda($('#testo-msg').value)">${ic('manda', 'sm')}Manda</button>
       <button class="btn vetro" onclick="copia($('#testo-msg').value)">${ic('copia', 'sm')}Copia</button></div>
+      ${x && ['avviso', 'promemoria', 'consiglio', 'evento'].includes(tipo) ? `<div class="fila"><button class="btn vetro" onclick="A.esportaVoce('${coll}','${id}')">${ic('giu', 'sm')}Esporta PDF</button></div>` : ''}
       ${tipo === 'sollecito' || tipo === 'sollecitoAdesione' ? inPrivato(tipo, x) : ''}`);
   },
   filtro(k) { filtroPag = k; render(); },

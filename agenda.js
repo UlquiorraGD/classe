@@ -58,17 +58,7 @@ MODULI.agenda = () => testaFoglio('scintilla', 'c-sky', 'Cosa vuoi aggiungere?')
     <button class="voce" onclick="apriFoglio(moduloEvento(giornoScelto))">${tile('calendario', 'c-sky')}<span class="corpo"><span class="tit">Un evento in calendario</span><span class="sub">colloqui, vacanze, gite, feste</span></span>${ic('dx')}</button>
     <button class="voce" onclick="apriFoglio(MODULI.riunioni())">${tile('riunione', 'c-violet')}<span class="corpo"><span class="tit">Il riassunto di una riunione</span><span class="sub">da mandare ai genitori</span></span>${ic('dx')}</button></div>`;
 
-async function condividiIcs(testo, nome) {
-  const file = new File([testo], nome, { type: 'text/calendar' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file] }); return; }
-    catch (e) { if (e.name === 'AbortError') return; }
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(file); a.download = nome;
-  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  toast('File scaricato: aprilo per aggiungere al calendario');
-}
+const condividiIcs = (testo, nome) => condividiFile(testo, nome, 'text/calendar', 'File scaricato: aprilo per aggiungere al calendario');
 
 Object.assign(A, {
   mese(delta) {
@@ -93,7 +83,8 @@ Object.assign(A, {
       ${e.note ? `<p>${esc(e.note)}</p>` : ''}
       <div class="fila"><button class="btn c-sky" onclick="A.msg('evento','${e.id}')">${ic('manda', 'sm')}Manda ai genitori</button>
       <button class="btn vetro" onclick="A.icsEvento('${e.id}')">${ic('calendario', 'sm')}Nel mio calendario</button></div>
-      <div class="fila"><button class="btn rosso" onclick="chiudiFoglio();A.elimina('eventi','${e.id}','agenda')">${ic('cestino', 'sm')}Elimina</button></div>`);
+      <div class="fila"><button class="btn vetro" onclick="A.esportaVoce('eventi','${e.id}')">${ic('giu', 'sm')}Esporta</button>
+      <button class="btn rosso" onclick="chiudiFoglio();A.elimina('eventi','${e.id}','agenda')">${ic('cestino', 'sm')}Elimina</button></div>`);
   },
   icsEvento(id) { const e = trova('eventi', id); if (e) condividiIcs(creaIcs([e]), 'evento-classe.ics'); },
   icsTutto() {
