@@ -1,7 +1,7 @@
 'use strict';
 /* Viste e azioni. Dipende da dati.js. */
 
-const TABS = ['oggi', 'cassa', 'avvisi', 'adesioni', 'riunioni', 'classe'];
+const TABS = ['oggi', 'cassa', 'avvisi', 'adesioni', 'agenda', 'classe'];
 let vista = { tab: 'oggi', id: null };
 let filtroPag = 'tutti';
 let ultimoPop = null;
@@ -49,6 +49,7 @@ function vOggi() {
   });
   cose.sort((a, b) => (a.q || '9999').localeCompare(b.q || '9999'));
   const n = cose.length;
+  const arrivo = vInArrivo();
   const eroe = `<div class="glass eroe"><div class="num${n ? '' : ' zero'}">${n}</div>
     <div><strong>${n === 0 ? 'Niente da inseguire' : n === 1 ? 'cosa da fare' : 'cose da fare'}</strong>
     <span class="muted">${n === 0 ? 'Goditi il caffè. ☕' : "Le più urgenti sono in cima. Un tocco e il messaggio è pronto."}</span></div></div>`;
@@ -62,7 +63,20 @@ function vOggi() {
     <button class="glass" onclick="A.nuovo('adesioni')">${tile('adesioni', 'c-aqua')}<b>Chiedere chi c'è</b></button>
     <button class="glass" style="grid-column:span 2;min-height:0;flex-direction:row;align-items:center;gap:14px" onclick="A.nuovo('riunioni')">${tile('riunione', 'c-violet')}<b>Riassumere una riunione</b></button>
   </div>`;
-  return [eroe, lista, bento].join('');
+  return [eroe, lista, arrivo, bento].join('');
+}
+
+/** Compleanni ed eventi dei prossimi 7 giorni. */
+function vInArrivo() {
+  const oggi = oggiISO();
+  const voci = impegniTra(oggi, piuGiorni(oggi, 7)).filter(v => v.tipo === 'evento' || v.tipo === 'compleanno');
+  if (!voci.length) return '';
+  return titoloSez('In arrivo') + `<div class="glass lista">${voci.map(v => {
+    const b = v.tipo === 'compleanno' ? S.bambini.find(x => v.apri.includes(x.id)) : null;
+    const azione = b ? `<button class="btn mini vetro" onclick="event.stopPropagation();A.msg('auguri','${b.id}')">Auguri</button>` : '';
+    return `<div class="voce" onclick="${v.apri}"><span class="tile" style="--c:${v.colore}">${ic(v.icona)}</span>
+      <span class="corpo"><span class="tit">${esc(v.titolo)}</span><span class="sub">${esc(v.sub)}</span> ${pillData(v.data)}</span>${azione}</div>`;
+  }).join('')}</div>`;
 }
 
 /* ---------- CASSA ---------- */
@@ -147,34 +161,17 @@ function vAdesione(a) {
       <button class="btn rosso" onclick="A.elimina('adesioni','${a.id}','adesioni')">${ic('cestino', 'sm')}Elimina</button></div>`;
 }
 
-/* ---------- RIUNIONI ---------- */
+/* ---------- RIUNIONI (dentro Agenda) ---------- */
 function vRiunioni() {
-  if (!S.consigli.length) return vuoto('riunione', 'c-violet', 'Nessuna riunione', 'Dopo il consiglio scrivi gli appunti come ti vengono, anche abbreviati: il messaggio ordinato per i genitori lo preparo io.', 'Nuovo riassunto', "A.nuovo('riunioni')");
-  return titoloSez('Riunioni') + `<div class="glass lista">${[...S.consigli].reverse().map(c => `
+  if (!S.consigli.length) return '';
+  return titoloSez('Riassunti delle riunioni') + `<div class="glass lista">${[...S.consigli].reverse().map(c => `
     <div class="voce" onclick="A.msg('consiglio','${c.id}')">${tile('riunione', 'c-violet')}<span class="corpo"><span class="tit">${esc(c.tipo)}</span><span class="sub">${dataIt(c.data)}</span></span>
-    <button class="icona-btn" aria-label="Elimina riunione" onclick="event.stopPropagation();A.elimina('consigli','${c.id}','riunioni')">${ic('cestino', 'sm')}</button></div>`).join('')}</div>`;
+    <button class="icona-btn" aria-label="Elimina riunione" onclick="event.stopPropagation();A.elimina('consigli','${c.id}','agenda')">${ic('cestino', 'sm')}</button></div>`).join('')}</div>`;
 }
 
-/* ---------- CLASSE ---------- */
-function vClasse() {
-  return `<div class="glass card"><h3>La classe</h3>
-    <form onsubmit="return A.salvaClasse(this)">
-      <div class="due"><div><label for="kc">Classe</label><input id="kc" name="classe" value="${esc(S.classe)}" placeholder="3ª B"></div>
-      <div><label for="ks">Scuola</label><input id="ks" name="scuola" value="${esc(S.scuola)}" placeholder="Primaria Rodari"></div></div>
-      <label for="ke">Bambini, uno per riga</label>
-      <textarea id="ke" name="elenco" rows="9" placeholder="Anna&#10;Luca&#10;Marco R.">${esc(S.bambini.map(b => b.nome).join('\n'))}</textarea>
-      <p class="aiuto">Basta il nome. Se due si chiamano uguale, aggiungi l'iniziale del cognome.</p>
-      <div class="fila"><button class="btn">${ic('ok', 'sm')}Salva</button></div>
-    </form></div>
-    <div class="glass card privacy">${tile('scudo', 'c-aqua')}<div><h3>Resta tutto qui</h3>
-      <p class="muted" style="margin:0">Nomi e pagamenti stanno solo su questo telefono, non vanno su internet. Ogni tanto salva una copia (mandatela su WhatsApp o in mail): se cambi telefono, la ricarichi da qui.</p></div></div>
-    <div class="fila"><button class="btn vetro" onclick="A.esporta()">${ic('giu', 'sm')}Salva una copia</button>
-      <label class="btn vetro" style="margin:0">${ic('su', 'sm')}Carica una copia<input class="nascosto" type="file" accept=".json,application/json" onchange="A.importa(this)"></label></div>
-    <div class="fila"><button class="btn rosso" onclick="A.azzera()">${ic('cestino', 'sm')}Cancella tutto</button></div>`;
-}
-
-const VISTE = { oggi: vOggi, cassa: vCassa, avvisi: vAvvisi, adesioni: vAdesioni, riunioni: vRiunioni, classe: vClasse };
-const FAB = { cassa: 'c-sun', avvisi: 'c-coral', adesioni: 'c-aqua', riunioni: 'c-violet' };
+/* Le viste Agenda e Classe stanno in agenda.js e classe.js (caricati dopo). */
+const VISTE = () => ({ oggi: vOggi, cassa: vCassa, avvisi: vAvvisi, adesioni: vAdesioni, agenda: vAgenda, classe: vClasse });
+const FAB = { cassa: 'c-sun', avvisi: 'c-coral', adesioni: 'c-aqua', agenda: 'c-sky' };
 
 function saluto() {
   const h = new Date().getHours();
@@ -191,7 +188,7 @@ function render(anima = false) {
   $('#chip').setAttribute('aria-label', `${S.bambini.length} bambini, apri la classe`);
   const main = $('#main');
   main.classList.remove('entra');
-  main.innerHTML = VISTE[vista.tab]();
+  main.innerHTML = VISTE()[vista.tab]();
   if (anima) {
     [...main.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 8)));
     void main.offsetWidth;
@@ -244,8 +241,8 @@ async function manda(testo) {
 
 /* ---------- moduli ---------- */
 const MODULI = {
-  cassa: () => testaFoglio('cassa', 'c-sun', 'Nuova raccolta') + `<form onsubmit="return A.creaRaccolta(this)">
-    <label for="rt">Per cosa?</label><input id="rt" name="titolo" required placeholder="Regalo di Natale maestre">
+  cassa: (titolo = '') => testaFoglio('cassa', 'c-sun', 'Nuova raccolta') + `<form onsubmit="return A.creaRaccolta(this)">
+    <label for="rt">Per cosa?</label><input id="rt" name="titolo" required placeholder="Regalo di Natale maestre" value="${esc(titolo)}">
     <div class="due"><div><label for="rq">Quota a bambino</label><input id="rq" name="quota" inputmode="decimal" required placeholder="5 €"></div>
     <div><label for="rs">Entro il</label><input id="rs" name="scadenza" type="date"></div></div>
     <div class="fila"><button class="btn c-sun pieno">${ic('scintilla', 'sm')}Crea e prepara il messaggio</button></div></form>`,
@@ -274,14 +271,15 @@ const A = {
     if (tab !== vista.tab || id !== vista.id) filtroPag = 'tutti';
     vista = { tab, id }; render(true); window.scrollTo({ top: 0 });
   },
-  nuovo(tab) { if (!S.bambini.length) { toast("Prima inserisci l'elenco della classe"); A.vai('classe'); return; } apriFoglio(MODULI[tab]()); },
-  msg(tipo, id) {
+  nuovo(tab, extra) { if (!S.bambini.length) { toast("Prima inserisci l'elenco della classe"); A.vai('classe'); return; } apriFoglio(MODULI[tab](extra)); },
+  msg(tipo, id, testoPronto) {
     const [coll, titolo, colore] = MSG_INFO[tipo];
-    const x = trova(coll, id); if (!x) return;
+    const x = trova(coll, id); if (!x && !testoPronto) return;
     apriFoglio(testaFoglio('fumetto', colore, titolo) + `<p class="aiuto" style="margin:0 2px 10px">Puoi correggerlo prima di mandarlo.</p>
-      <textarea class="messaggio" id="testo-msg" rows="11" aria-label="Testo del messaggio">${esc(TESTI[tipo](x))}</textarea>
+      <textarea class="messaggio" id="testo-msg" rows="11" aria-label="Testo del messaggio">${esc(testoPronto || TESTI[tipo](x))}</textarea>
       <div class="fila"><button class="btn ${colore}" onclick="manda($('#testo-msg').value)">${ic('manda', 'sm')}Manda</button>
-      <button class="btn vetro" onclick="copia($('#testo-msg').value)">${ic('copia', 'sm')}Copia</button></div>`);
+      <button class="btn vetro" onclick="copia($('#testo-msg').value)">${ic('copia', 'sm')}Copia</button></div>
+      ${tipo === 'sollecito' || tipo === 'sollecitoAdesione' ? inPrivato(tipo, x) : ''}`);
   },
   filtro(k) { filtroPag = k; render(); },
 
@@ -360,18 +358,10 @@ const A = {
   creaRiunione(f) {
     const c = { id: uid(), tipo: f.tipo.value, data: f.data.value, appunti: f.appunti.value };
     salva({ ...S, consigli: [...S.consigli, c] });
-    A.vai('riunioni'); A.msg('consiglio', c.id);
+    A.vai('agenda'); A.msg('consiglio', c.id);
     return false;
   },
 
-  salvaClasse(f) {
-    const nomi = [...new Set(f.elenco.value.split('\n').map(s => s.trim()).filter(Boolean))];
-    const bambini = nomi.map(nome => S.bambini.find(b => b.nome === nome) || { id: uid(), nome })
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
-    salva({ ...S, classe: f.classe.value.trim(), scuola: f.scuola.value.trim(), bambini });
-    toast(`Salvato: ${bambini.length} bambini`);
-    return false;
-  },
   esporta() {
     const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -403,4 +393,3 @@ $('#foglio').addEventListener('click', e => {
   const r = e.target.getBoundingClientRect();
   if (e.clientY < r.top) chiudiFoglio(); // tocco sul velo sopra il foglio
 });
-render(true);
