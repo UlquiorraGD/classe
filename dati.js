@@ -131,21 +131,29 @@ function creaIcs(eventi) {
 const pagatiDi = r => S.bambini.filter(b => r.pagati[b.id]);
 const mancantiRaccolta = r => S.bambini.filter(b => !r.pagati[b.id]);
 const speseTot = r => r.spese.reduce((t, s) => t + s.importo, 0);
+/* Un pagamento è la data (quota uguale per tutti) oppure { data, importo } (cifra libera). */
+const dataPagamento = v => v && typeof v === 'object' ? v.data : v;
+const quotaPagata = (r, bid) => { const v = r.pagati[bid]; return v && typeof v === 'object' ? v.importo : r.quota; };
+const incassato = r => pagatiDi(r).reduce((t, b) => t + quotaPagata(r, b.id), 0);
+const descrizioneQuota = r => r.libera ? (r.quota ? `cifra libera, circa ${euro(r.quota)}` : 'cifra libera') : `${euro(r.quota)} a bambino`;
+const codaScadenza = r => r.scadenza ? `entro ${dataIt(r.scadenza)}` : '';
 const mancantiAdesione = a => S.bambini.filter(b => !a.risposte[b.id]);
 const COLORI_OPZIONI = ['var(--aqua)', 'var(--coral)', 'var(--sun)', 'var(--violet)', 'var(--sky)'];
 
 /* ---------- testi dei messaggi ---------- */
 const TESTI = {
-  lancioRaccolta: r => `💶 ${r.titolo}\n\nQuota: ${euro(r.quota)} a bambino` +
+  lancioRaccolta: r => `💶 ${r.titolo}\n\n` +
+    (r.libera ? `Ognuno sceglie, quindi la cifra cambia da bambino a bambino${r.quota ? ` (più o meno ${euro(r.quota)})` : ''}.`
+      : `Quota: ${euro(r.quota)} a bambino`) +
     (r.scadenza ? `\nEntro: ${dataIt(r.scadenza)}` : '') +
     `\n\nMan mano segno io chi ha pagato, non serve scriverlo nel gruppo. Grazie! 🙏`,
   sollecito: r => {
     const m = mancantiRaccolta(r).map(b => b.nome);
-    return `Ciao a tutti! Per "${r.titolo}" mi mancano ancora ${m.length === 1 ? 'la quota' : 'le quote'} di:\n${elenco(m)}\n\n` +
-      `Quota: ${euro(r.quota)}` + (r.scadenza ? `, entro ${dataIt(r.scadenza)}` : '') + `. Grazie! 🙏`;
+    const coda = r.libera ? (r.scadenza ? `La scadenza è ${dataIt(r.scadenza)}. ` : '') : `Quota: ${euro(r.quota)}${r.scadenza ? ', ' + codaScadenza(r) : ''}. `;
+    return `Ciao a tutti! Per "${r.titolo}" mi mancano ancora ${m.length === 1 ? 'la quota' : 'le quote'} di:\n${elenco(m)}\n\n${coda}Grazie! 🙏`;
   },
   resoconto: r => {
-    const p = pagatiDi(r).length, inc = p * r.quota, sp = speseTot(r);
+    const p = pagatiDi(r).length, inc = incassato(r), sp = speseTot(r);
     return `📊 Resoconto "${r.titolo}"\n\nRaccolti: ${euro(inc)} (${p} quote su ${S.bambini.length})\n` +
       `Spesi: ${euro(sp)}` + (r.spese.length ? '\n' + r.spese.map(s => `• ${s.desc}: ${euro(s.importo)}`).join('\n') : '') +
       `\nRimasti in cassa: ${euro(inc - sp)}\n\nGli scontrini sono a disposizione di chi vuole vederli.`;
@@ -170,8 +178,9 @@ const TESTI = {
       `Per qualsiasi dubbio scrivetemi pure in privato. Buona serata!`;
   },
   risposta: x => x.risposta,
-  sollecitoPrivato: (r, b, g) => `Ciao${g.nome ? ' ' + g.nome : ''}! Per "${r.titolo}" mi manca ancora la quota di ${b.nome} (${euro(r.quota)}` +
-    (r.scadenza ? `, entro ${dataIt(r.scadenza)}` : '') + `). Quando riesci, grazie! 🙏`,
+  sollecitoPrivato: (r, b, g) => `Ciao${g.nome ? ' ' + g.nome : ''}! Per "${r.titolo}" mi manca ancora la quota di ${b.nome}` +
+    ([r.libera ? '' : euro(r.quota), codaScadenza(r)].filter(Boolean).map((t, i, a) => (i ? ', ' : ' (') + t + (i === a.length - 1 ? ')' : '')).join('')) +
+    `. Quando riesci, grazie! 🙏`,
   adesionePrivata: (a, b, g) => `Ciao${g.nome ? ' ' + g.nome : ''}! Per "${a.domanda}" mi manca la risposta per ${b.nome}: ${a.opzioni.join(' / ')}? Grazie! 🙏`,
   auguri: b => {
     const p = prossimoCompleanno(b.compleanno);

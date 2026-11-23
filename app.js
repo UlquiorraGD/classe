@@ -87,22 +87,28 @@ function vCassa() {
   return titoloSez('Raccolte') + `<div class="lista">${[...S.raccolte].reverse().map(r => {
     const p = pagatiDi(r).length;
     return `<button class="glass voce" onclick="A.vai('cassa','${r.id}')">${anello(p, tot, 'var(--sun)')}
-      <span class="corpo"><span class="tit">${esc(r.titolo)}</span><span class="sub">${euro(r.quota)} a testa · ${euro(p * r.quota)} raccolti</span>
+      <span class="corpo"><span class="tit">${esc(r.titolo)}</span><span class="sub">${r.libera ? 'cifra libera' : euro(r.quota) + ' a testa'} · ${euro(incassato(r))} raccolti</span>
       ${r.chiusa ? '<span class="pill ok">chiusa</span>' : pillData(r.scadenza)}</span>${ic('dx')}</button>`;
   }).join('')}</div>`;
 }
 
 function vRaccolta(r) {
-  const tot = S.bambini.length, p = pagatiDi(r).length, inc = p * r.quota, sp = speseTot(r);
+  const tot = S.bambini.length, p = pagatiDi(r).length, inc = incassato(r), sp = speseTot(r);
   const visibili = S.bambini.filter(b => filtroPag === 'tutti' || (filtroPag === 'pagati') === !!r.pagati[b.id]);
   const filtro = (k, t) => `<button aria-pressed="${filtroPag === k}" onclick="A.filtro('${k}')">${t}</button>`;
+  const stato = b => {
+    const v = r.pagati[b.id];
+    if (!v) return r.libera ? 'da pagare · tocca e scrivi la cifra' : 'da pagare';
+    return `pagato il ${dataBreve(dataPagamento(v))}`;
+  };
   const righe = visibili.map(b => `<button class="voce ${r.pagati[b.id] ? 'si' : ''} ${ultimoPop === b.id ? 'pop' : ''}" onclick="A.paga('${r.id}','${b.id}')" aria-pressed="${!!r.pagati[b.id]}">
-      ${avatar(b.nome)}<span class="corpo"><span class="tit">${esc(b.nome)}</span><span class="sub">${r.pagati[b.id] ? 'pagato il ' + dataBreve(r.pagati[b.id]) : 'da pagare'}</span></span>
+      ${avatar(b.nome)}<span class="corpo"><span class="tit">${esc(b.nome)}</span><span class="sub">${stato(b)}</span></span>
+      ${r.libera && r.pagati[b.id] ? `<span class="importo">${euro(quotaPagata(r, b.id))}</span>` : ''}
       <span class="spunta">${ic('ok', 'sm')}</span></button>`).join('') || `<p class="muted" style="padding:14px">Nessuno in questa lista.</p>`;
   const spese = r.spese.map(s => `<tr><td>${esc(s.desc)}</td><td>${euro(s.importo)}<button class="x" aria-label="Togli ${esc(s.desc)}" onclick="A.togliSpesa('${r.id}','${s.id}')">${ic('x', 'sm')}</button></td></tr>`).join('');
   return `${indietro('cassa')}
     <div class="glass card"><div class="dettaglio-eroe">${anello(p, tot, 'var(--sun)', true)}
-      <div><h3>${esc(r.titolo)}</h3><p class="muted">${euro(r.quota)} a bambino</p>${pillData(r.scadenza)}</div></div>
+      <div><h3>${esc(r.titolo)}</h3><p class="muted">${descrizioneQuota(r)}</p>${pillData(r.scadenza)}</div></div>
       <div class="stat-grid"><div class="stat"><b>${euro(inc)}</b><span>raccolti</span></div><div class="stat"><b>${euro(sp)}</b><span>spesi</span></div><div class="stat"><b>${euro(inc - sp)}</b><span>in cassa</span></div></div>
       <div class="fila"><button class="btn c-sun" onclick="A.msg('sollecito','${r.id}')" ${p === tot ? 'disabled' : ''}>${ic('campana', 'sm')}Sollecita</button>
       <button class="btn vetro" onclick="A.msg('lancioRaccolta','${r.id}')">${ic('manda', 'sm')}Annuncio</button></div></div>
@@ -243,7 +249,9 @@ async function manda(testo) {
 const MODULI = {
   cassa: (titolo = '') => testaFoglio('cassa', 'c-sun', 'Nuova raccolta') + `<form onsubmit="return A.creaRaccolta(this)">
     <label for="rt">Per cosa?</label><input id="rt" name="titolo" required placeholder="Regalo di Natale maestre" value="${esc(titolo)}">
-    <div class="due"><div><label for="rq">Quota a bambino</label><input id="rq" name="quota" inputmode="decimal" required placeholder="5 €"></div>
+    <label class="interruttore" for="ru"><span><b>Stessa cifra per tutti</b><span class="aiuto" id="ru-aiuto">Spegnilo se ognuno paga una cifra diversa (es. fiori, ognuno sceglie il vaso)</span></span>
+      <input id="ru" name="uguale" type="checkbox" role="switch" checked onchange="A.cambiaUguale(this)"></label>
+    <div class="due"><div><label for="rq" id="rq-et">Quota a bambino</label><input id="rq" name="quota" inputmode="decimal" required placeholder="5 €"></div>
     <div><label for="rs">Entro il</label><input id="rs" name="scadenza" type="date"></div></div>
     <div class="fila"><button class="btn c-sun pieno">${ic('scintilla', 'sm')}Crea e prepara il messaggio</button></div></form>`,
   avvisi: () => testaFoglio('avviso', 'c-coral', 'Nuovo avviso') + `<form onsubmit="return A.creaAvviso(this)">
@@ -283,20 +291,61 @@ const A = {
   },
   filtro(k) { filtroPag = k; render(); },
 
+  cambiaUguale(cb) {
+    const quota = $('#rq');
+    $('#rq-et').textContent = cb.checked ? 'Quota a bambino' : 'Cifra indicativa (se vuoi)';
+    quota.required = cb.checked;
+    quota.placeholder = cb.checked ? '5 €' : 'facoltativa';
+  },
   creaRaccolta(f) {
+    const libera = !f.uguale.checked;
     const quota = numero(f.quota.value);
-    if (quota <= 0) { toast('Scrivi una quota valida, es. 5'); return false; }
-    const r = { id: uid(), titolo: f.titolo.value.trim(), quota, scadenza: f.scadenza.value, pagati: {}, spese: [], chiusa: false };
+    if (!libera && quota <= 0) { toast('Scrivi una quota valida, es. 5'); return false; }
+    const r = { id: uid(), titolo: f.titolo.value.trim(), quota: Math.max(0, quota), libera, scadenza: f.scadenza.value, pagati: {}, spese: [], chiusa: false };
     salva({ ...S, raccolte: [...S.raccolte, r] });
     A.vai('cassa', r.id); A.msg('lancioRaccolta', r.id);
     return false;
   },
   paga(rid, bid) {
+    const r = trova('raccolte', rid);
+    if (r && r.libera) { A.formImporto(rid, bid); return; }
     vibra(); ultimoPop = bid;
-    aggiorna('raccolte', rid, r => {
-      const { [bid]: gia, ...altri } = r.pagati;
-      return { ...r, pagati: gia ? altri : { ...altri, [bid]: oggiISO() } };
+    aggiorna('raccolte', rid, x => {
+      const { [bid]: gia, ...altri } = x.pagati;
+      return { ...x, pagati: gia ? altri : { ...altri, [bid]: oggiISO() } };
     });
+  },
+  /* Cifra libera: al tocco si scrive quanto ha pagato quel bambino. */
+  formImporto(rid, bid) {
+    const r = trova('raccolte', rid), b = trova('bambini', bid);
+    if (!r || !b) return;
+    const gia = r.pagati[bid];
+    const usate = [...new Set(Object.values(r.pagati).map(v => v && typeof v === 'object' ? v.importo : r.quota))].filter(n => n > 0).sort((x, y) => x - y).slice(0, 5);
+    const valore = gia ? quotaPagata(r, bid) : (r.quota || '');
+    apriFoglio(`<div class="foglio-t">${avatar(b.nome)}<h3 id="foglio-titolo">${esc(b.nome)}</h3>
+        <button class="icona-btn" aria-label="Chiudi" onclick="chiudiFoglio()">${ic('x', 'sm')}</button></div>
+      <form onsubmit="return A.salvaImporto(this,'${rid}','${bid}')">
+        <label for="ii">Quanto ha pagato per "${esc(r.titolo)}"?</label>
+        <input id="ii" name="importo" inputmode="decimal" required value="${valore ? String(valore).replace('.', ',') : ''}" placeholder="12,50 €">
+        ${usate.length ? `<div class="chips">${usate.map(n => `<button type="button" class="chip" onclick="$('#ii').value='${String(n).replace('.', ',')}'">${euro(n)}</button>`).join('')}</div>` : ''}
+        <div class="fila"><button class="btn c-sun pieno">${ic('ok', 'sm')}${gia ? 'Aggiorna' : 'Segna come pagato'}</button></div>
+      </form>
+      ${gia ? `<div class="fila"><button class="btn rosso" onclick="A.nonPagato('${rid}','${bid}')">${ic('x', 'sm')}Segna come non pagato</button></div>` : ''}`);
+  },
+  salvaImporto(f, rid, bid) {
+    const importo = numero(f.importo.value);
+    if (importo <= 0) { toast('Scrivi una cifra valida, es. 12,50'); return false; }
+    vibra(); ultimoPop = bid;
+    aggiorna('raccolte', rid, x => {
+      const prima = x.pagati[bid];
+      return { ...x, pagati: { ...x.pagati, [bid]: { data: dataPagamento(prima) || oggiISO(), importo } } };
+    });
+    chiudiFoglio();
+    return false;
+  },
+  nonPagato(rid, bid) {
+    aggiorna('raccolte', rid, x => { const { [bid]: _tolto, ...altri } = x.pagati; return { ...x, pagati: altri }; });
+    chiudiFoglio();
   },
   formSpesa(rid) {
     apriFoglio(testaFoglio('scontrino', 'c-sun', 'Nuova spesa') + `<form onsubmit="return A.creaSpesa(this,'${rid}')">

@@ -1,5 +1,5 @@
 /* Rende l'app usabile anche senza rete. Cambiare VERSIONE a ogni aggiornamento. */
-const VERSIONE = 'classe-v3';
+const VERSIONE = 'classe-v4';
 const FILE = ['./', 'index.html', 'style.css', 'dati.js', 'app.js', 'classe.js', 'agenda.js', 'manifest.webmanifest', 'icona.svg', 'icona-192.png', 'icona-512.png'];
 
 self.addEventListener('install', e => {
