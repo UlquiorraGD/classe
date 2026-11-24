@@ -2,11 +2,11 @@
 /* Classe: schede dei bambini, numeri dei genitori, compleanni, messaggi in privato. Dipende da dati.js e app.js. */
 
 function sottotitoloBambino(b) {
-  const parti = [];
+  const parti = [`N° ${b.numero}`];
   if (b.compleanno) parti.push('🎂 ' + new Date(b.compleanno + 'T12:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' }));
   const n = genitoriDi(b).length;
   if (n) parti.push(n === 1 ? '1 numero' : n + ' numeri');
-  return parti.join(' · ') || 'tocca per compleanno e numeri';
+  return parti.length > 1 ? parti.join(' · ') : parti[0] + ' · tocca per compleanno e numeri';
 }
 
 function vClasse() {
@@ -63,7 +63,8 @@ function moduloScheda(b) {
       <button class="btn vetro" onclick="A.nuovo('cassa','Regalo per ${esc(b.nome)}')">${ic('cassa', 'sm')}Raccolta regalo</button></div>` : ''}
     <form onsubmit="return A.salvaScheda(this,'${b.id}')">
       <div class="due"><div><label for="bn">Nome</label><input id="bn" name="nome" required value="${esc(b.nome)}"></div>
-      <div><label for="bc">Compleanno</label><input id="bc" name="compleanno" type="date" value="${esc(b.compleanno || '')}"></div></div>
+      <div><label for="bk">N° registro</label><input id="bk" name="numero" type="number" inputmode="numeric" min="1" required value="${b.numero}"></div></div>
+      <label for="bc">Compleanno</label><input id="bc" name="compleanno" type="date" value="${esc(b.compleanno || '')}">
       ${g.map((x, i) => `<div class="due"><div><label for="gn${i}">${i ? 'Altro genitore' : 'Genitore'}</label><input id="gn${i}" name="gn${i}" value="${esc(x.nome)}" placeholder="${i ? 'Papà Marco' : 'Mamma Giulia'}"></div>
         <div><label for="gt${i}">Cellulare</label><input id="gt${i}" name="gt${i}" type="tel" inputmode="tel" value="${esc(x.tel)}" placeholder="333 123 4567"></div></div>`).join('')}
       <p class="aiuto">I numeri servono solo per aprire la chat WhatsApp dal tuo telefono.</p>
@@ -80,8 +81,12 @@ Object.assign(A, {
     const genitori = [0, 1].map(i => ({ nome: f['gn' + i].value.trim(), tel: f['gt' + i].value.trim() })).filter(g => g.nome || g.tel);
     const errato = genitori.find(g => g.tel && !telefonoWa(g.tel));
     if (errato) { toast(`Il numero "${errato.tel}" non sembra giusto`); return false; }
-    const bambini = S.bambini.map(b => b.id === id ? { ...b, nome, compleanno: f.compleanno.value, genitori } : b)
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+    const numero = parseInt(f.numero.value, 10);
+    if (!(numero > 0)) { toast('Scrivi un numero di registro valido'); return false; }
+    const doppio = S.bambini.find(b => b.id !== id && b.numero === numero);
+    if (doppio) { toast(`Il N° ${numero} è già di ${doppio.nome}`); return false; }
+    const bambini = S.bambini.map(b => b.id === id ? { ...b, nome, numero, compleanno: f.compleanno.value, genitori } : b)
+      .sort((a, b) => a.numero - b.numero);
     salva({ ...S, bambini });
     chiudiFoglio(); toast('Salvato');
     return false;
@@ -100,13 +105,12 @@ Object.assign(A, {
     apriFoglio(testaFoglio('classe', 'c-sky', 'Elenco della classe') + `<form onsubmit="return A.salvaElenco(this)">
       <label for="ke">Un nome per riga</label>
       <textarea id="ke" name="elenco" rows="12" placeholder="Anna&#10;Luca&#10;Marco R.">${esc(S.bambini.map(b => b.nome).join('\n'))}</textarea>
-      <p class="aiuto">Basta il nome. Se due si chiamano uguale, aggiungi l'iniziale del cognome. Compleanni e numeri restano.</p>
+      <p class="aiuto">Nello stesso ordine del registro: la prima riga è il N° 1, la seconda il N° 2… Va bene nome e cognome. Compleanni e telefoni restano.</p>
       <div class="fila"><button class="btn pieno">${ic('ok', 'sm')}Salva elenco</button></div></form>`);
   },
   salvaElenco(f) {
     const nomi = [...new Set(f.elenco.value.split('\n').map(s => s.trim()).filter(Boolean))];
-    const bambini = nomi.map(nome => S.bambini.find(b => b.nome === nome) || { id: uid(), nome, compleanno: '', genitori: [] })
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+    const bambini = nomi.map((nome, i) => ({ ...(S.bambini.find(b => b.nome === nome) || { id: uid(), nome, compleanno: '', genitori: [] }), numero: i + 1 }));
     salva({ ...S, bambini });
     chiudiFoglio(); toast(`Salvato: ${bambini.length} bambini`);
     return false;

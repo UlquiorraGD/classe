@@ -297,6 +297,21 @@ dialog.foglio::backdrop { background: rgba(8, 4, 30, .45); -webkit-backdrop-filt
 .chip:active { transform: scale(.92); }
 .importo { font: 800 15px var(--f-display); color: var(--ok); white-space: nowrap; }
 
+/* ============ Listino e ordini ============ */
+[hidden] { display: none !important; }
+.righe { display: flex; flex-direction: column; gap: 8px; }
+.riga-art { display: grid; grid-template-columns: 1fr 96px 40px; gap: 8px; align-items: center; }
+.riga-ord { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px; border-radius: 18px; background: var(--glass-in); border: 1px solid var(--stroke); animation: sali var(--t-mid) var(--ease) both; }
+.riga-ord select { grid-column: 1 / -1; min-width: 0; padding-right: 34px; }
+.riga-ord .contatore { justify-self: start; }
+.contatore { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 14px; background: var(--glass-in); border: 1px solid var(--stroke-forte); }
+.contatore button { width: 36px; height: 40px; border: 0; border-radius: 10px; background: var(--glass-2); color: var(--ink); font: 800 20px/1 var(--f-display); cursor: pointer; transition: transform var(--t-fast) var(--ease); }
+.contatore button:active { transform: scale(.88); }
+.contatore b { min-width: 28px; text-align: center; font: 800 18px var(--f-display); font-variant-numeric: tabular-nums; }
+.totale-ordine { display: flex; justify-content: space-between; align-items: baseline; margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: color-mix(in srgb, var(--sun) 16%, transparent); border: 1px solid color-mix(in srgb, var(--sun) 40%, transparent); }
+.totale-ordine span { font-weight: 700; color: var(--ink-2); }
+.totale-ordine b { font: 800 24px var(--f-display); letter-spacing: -.02em; }
+
 /* ============ Calendario ============ */
 .cal-testa { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .cal-testa h3 { margin: 0; text-align: center; flex: 1; }

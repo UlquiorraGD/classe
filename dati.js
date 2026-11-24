@@ -10,11 +10,17 @@ let precedente = null; // per "Annulla"
 function carica() {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? { ...VUOTO, ...JSON.parse(raw) } : { ...VUOTO };
+    return normalizza(raw ? { ...VUOTO, ...JSON.parse(raw) } : { ...VUOTO });
   } catch (e) {
     console.warn('Dati non leggibili, riparto da zero:', e);
     return { ...VUOTO };
   }
+}
+
+/** Aggiorna i dati salvati con versioni vecchie: ogni bambino ha il suo N° (ordine nell'elenco). */
+function normalizza(dati) {
+  const bambini = dati.bambini.map((b, i) => (b.numero ? b : { ...b, numero: i + 1 }));
+  return { ...dati, bambini: bambini.slice().sort((a, b) => a.numero - b.numero) };
 }
 
 function scrivi(nuovo) {
@@ -129,28 +135,58 @@ function creaIcs(eventi) {
 
 /* ---------- calcoli ---------- */
 const pagatiDi = r => S.bambini.filter(b => r.pagati[b.id]);
-const mancantiRaccolta = r => S.bambini.filter(b => !r.pagati[b.id]);
+const mancantiRaccolta = r => conListino(r)
+  ? S.bambini.filter(b => haOrdinato(r, b.id) && !r.pagati[b.id])
+  : S.bambini.filter(b => !r.pagati[b.id]);
+
+/* ---------- raccolte con listino: ognuno ordina una o più cose ---------- */
+const conListino = r => !!(r.listino && r.listino.length);
+const ordineDi = (r, bid) => (r.ordini && r.ordini[bid]) || [];
+const articoloDi = (r, aid) => (r.listino || []).find(a => a.id === aid);
+const haOrdinato = (r, bid) => ordineDi(r, bid).some(o => o.qta > 0 && articoloDi(r, o.articolo));
+const totaleOrdine = (r, bid) => ordineDi(r, bid).reduce((t, o) => t + ((articoloDi(r, o.articolo) || {}).prezzo || 0) * o.qta, 0);
+const ordinanti = r => S.bambini.filter(b => haOrdinato(r, b.id) || r.pagati[b.id]);
+const totaleOrdinato = r => S.bambini.reduce((t, b) => t + totaleOrdine(r, b.id), 0);
+const descrizioneOrdine = (r, bid) => ordineDi(r, bid).filter(o => o.qta > 0 && articoloDi(r, o.articolo))
+  .map(o => `${o.qta}× ${articoloDi(r, o.articolo).nome}`).join(', ');
+/** Quanti pezzi di ogni articolo sono stati ordinati in tutto (per il fornitore). */
+const riepilogoArticoli = r => r.listino.map(a => {
+  const qta = S.bambini.reduce((t, b) => t + ordineDi(r, b.id).filter(o => o.articolo === a.id).reduce((s, o) => s + o.qta, 0), 0);
+  return { ...a, qta, importo: qta * a.prezzo };
+});
 const speseTot = r => r.spese.reduce((t, s) => t + s.importo, 0);
 /* Un pagamento è la data (quota uguale per tutti) oppure { data, importo } (cifra libera). */
 const dataPagamento = v => v && typeof v === 'object' ? v.data : v;
-const quotaPagata = (r, bid) => { const v = r.pagati[bid]; return v && typeof v === 'object' ? v.importo : r.quota; };
+const quotaPagata = (r, bid) => {
+  const v = r.pagati[bid];
+  const importo = v && typeof v === 'object' ? v.importo : r.quota;
+  if (conListino(r)) return haOrdinato(r, bid) ? totaleOrdine(r, bid) : (v && typeof v === 'object' ? v.importo : 0);
+  return importo;
+};
 const incassato = r => pagatiDi(r).reduce((t, b) => t + quotaPagata(r, b.id), 0);
-const descrizioneQuota = r => r.libera ? (r.quota ? `cifra libera, circa ${euro(r.quota)}` : 'cifra libera') : `${euro(r.quota)} a bambino`;
+const descrizioneQuota = r => conListino(r) ? `con listino · ${r.listino.length} ${r.listino.length === 1 ? 'articolo' : 'articoli'}`
+  : r.libera ? (r.quota ? `cifra libera, circa ${euro(r.quota)}` : 'cifra libera') : `${euro(r.quota)} a bambino`;
 const codaScadenza = r => r.scadenza ? `entro ${dataIt(r.scadenza)}` : '';
 const mancantiAdesione = a => S.bambini.filter(b => !a.risposte[b.id]);
 const COLORI_OPZIONI = ['var(--aqua)', 'var(--coral)', 'var(--sun)', 'var(--violet)', 'var(--sky)'];
 
 /* ---------- testi dei messaggi ---------- */
 const TESTI = {
-  lancioRaccolta: r => `💶 ${r.titolo}\n\n` +
-    (r.libera ? `Ognuno sceglie, quindi la cifra cambia da bambino a bambino${r.quota ? ` (più o meno ${euro(r.quota)})` : ''}.`
-      : `Quota: ${euro(r.quota)} a bambino`) +
-    (r.scadenza ? `\nEntro: ${dataIt(r.scadenza)}` : '') +
-    `\n\nMan mano segno io chi ha pagato, non serve scriverlo nel gruppo. Grazie! 🙏`,
+  lancioRaccolta: r => conListino(r)
+    ? `💶 ${r.titolo}\n\nOgnuno sceglie cosa ordinare:\n${r.listino.map(a => `• ${a.nome}: ${euro(a.prezzo)}`).join('\n')}` +
+      (r.scadenza ? `\n\nEntro: ${dataIt(r.scadenza)}` : '') +
+      `\n\nScrivetemi in privato cosa volete e quanti pezzi, segno io. Grazie! 🙏`
+    : `💶 ${r.titolo}\n\n` +
+      (r.libera ? `Ognuno sceglie, quindi la cifra cambia da bambino a bambino${r.quota ? ` (più o meno ${euro(r.quota)})` : ''}.`
+        : `Quota: ${euro(r.quota)} a bambino`) +
+      (r.scadenza ? `\nEntro: ${dataIt(r.scadenza)}` : '') +
+      `\n\nMan mano segno io chi ha pagato, non serve scriverlo nel gruppo. Grazie! 🙏`,
   sollecito: r => {
-    const m = mancantiRaccolta(r).map(b => b.nome);
+    const lista = conListino(r)
+      ? mancantiRaccolta(r).map(b => `${b.nome} (${euro(totaleOrdine(r, b.id))})`)
+      : mancantiRaccolta(r).map(b => b.nome);
     const coda = r.libera ? (r.scadenza ? `La scadenza è ${dataIt(r.scadenza)}. ` : '') : `Quota: ${euro(r.quota)}${r.scadenza ? ', ' + codaScadenza(r) : ''}. `;
-    return `Ciao a tutti! Per "${r.titolo}" mi mancano ancora ${m.length === 1 ? 'la quota' : 'le quote'} di:\n${elenco(m)}\n\n${coda}Grazie! 🙏`;
+    return `Ciao a tutti! Per "${r.titolo}" mi ${lista.length === 1 ? 'manca ancora la quota' : 'mancano ancora le quote'} di:\n${elenco(lista)}\n\n${coda}Grazie! 🙏`;
   },
   resoconto: r => {
     const p = pagatiDi(r).length, inc = incassato(r), sp = speseTot(r);
@@ -178,7 +214,10 @@ const TESTI = {
       `Per qualsiasi dubbio scrivetemi pure in privato. Buona serata!`;
   },
   risposta: x => x.risposta,
-  sollecitoPrivato: (r, b, g) => `Ciao${g.nome ? ' ' + g.nome : ''}! Per "${r.titolo}" mi manca ancora la quota di ${b.nome}` +
+  sollecitoPrivato: (r, b, g) => conListino(r)
+    ? `Ciao${g.nome ? ' ' + g.nome : ''}! Per "${r.titolo}" per ${b.nome} avete ordinato ${descrizioneOrdine(r, b.id)}: in tutto ${euro(totaleOrdine(r, b.id))}` +
+      (r.scadenza ? `, ${codaScadenza(r)}` : '') + `. Quando riesci, grazie! 🙏`
+    : `Ciao${g.nome ? ' ' + g.nome : ''}! Per "${r.titolo}" mi manca ancora la quota di ${b.nome}` +
     ([r.libera ? '' : euro(r.quota), codaScadenza(r)].filter(Boolean).map((t, i, a) => (i ? ', ' : ' (') + t + (i === a.length - 1 ? ')' : '')).join('')) +
     `. Quando riesci, grazie! 🙏`,
   adesionePrivata: (a, b, g) => `Ciao${g.nome ? ' ' + g.nome : ''}! Per "${a.domanda}" mi manca la risposta per ${b.nome}: ${a.opzioni.join(' / ')}? Grazie! 🙏`,

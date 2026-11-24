@@ -83,16 +83,36 @@ function vInArrivo() {
 function vCassa() {
   if (vista.id) { const r = trova('raccolte', vista.id); if (r) return vRaccolta(r); }
   if (!S.raccolte.length) return vuoto('cassa', 'c-sun', 'Nessuna raccolta', 'Regalo alle maestre, gita, fondo cassa: crei la raccolta e il messaggio per il gruppo è già scritto.', 'Nuova raccolta', "A.nuovo('cassa')");
-  const tot = S.bambini.length;
   return titoloSez('Raccolte') + `<div class="lista">${[...S.raccolte].reverse().map(r => {
     const p = pagatiDi(r).length;
+    const tot = conListino(r) ? ordinanti(r).length : S.bambini.length;
+    const modo = conListino(r) ? `${tot} ordini` : r.libera ? 'cifra libera' : euro(r.quota) + ' a testa';
     return `<button class="glass voce" onclick="A.vai('cassa','${r.id}')">${anello(p, tot, 'var(--sun)')}
-      <span class="corpo"><span class="tit">${esc(r.titolo)}</span><span class="sub">${r.libera ? 'cifra libera' : euro(r.quota) + ' a testa'} · ${euro(incassato(r))} raccolti</span>
+      <span class="corpo"><span class="tit">${esc(r.titolo)}</span><span class="sub">${modo} · ${euro(incassato(r))} raccolti</span>
       ${r.chiusa ? '<span class="pill ok">chiusa</span>' : pillData(r.scadenza)}</span>${ic('dx')}</button>`;
   }).join('')}</div>`;
 }
 
+/** Spese della raccolta (tabella + tasti): uguale per tutti i tipi di raccolta. */
+function sezSpese(r) {
+  const sp = speseTot(r);
+  const spese = r.spese.map(s => `<tr><td>${esc(s.desc)}</td><td>${euro(s.importo)}<button class="x" aria-label="Togli ${esc(s.desc)}" onclick="A.togliSpesa('${r.id}','${s.id}')">${ic('x', 'sm')}</button></td></tr>`).join('');
+  return `${titoloSez('Spese')}
+    <div class="glass card">${r.spese.length ? `<table class="tabella"><tbody>${spese}<tr class="tot"><td>Totale</td><td>${euro(sp)}</td></tr></tbody></table>` : '<p class="muted">Ancora nessuna spesa. Quando compri qualcosa, segnala qui: il resoconto si fa da solo.</p>'}
+      <div class="fila"><button class="btn vetro" onclick="A.formSpesa('${r.id}')">${ic('scontrino', 'sm')}Aggiungi spesa</button>
+      <button class="btn c-sun" onclick="A.msg('resoconto','${r.id}')">${ic('manda', 'sm')}Resoconto</button></div></div>`;
+}
+
+/** Tasti in fondo alla raccolta. */
+function sezFondo(r) {
+  return `<div class="fila"><button class="btn vetro" onclick="A.modificaRaccolta('${r.id}')">${ic('matita', 'sm')}Modifica</button>
+      <button class="btn vetro" onclick="A.esportaVoce('raccolte','${r.id}')">${ic('giu', 'sm')}Esporta</button></div>
+    <div class="fila"><button class="btn vetro" onclick="A.chiudi('raccolte','${r.id}')">${ic(r.chiusa ? 'su' : 'lucchetto', 'sm')}${r.chiusa ? 'Riapri' : 'Chiudi'}</button>
+      <button class="btn rosso" onclick="A.elimina('raccolte','${r.id}','cassa')">${ic('cestino', 'sm')}Elimina</button></div>`;
+}
+
 function vRaccolta(r) {
+  if (conListino(r)) return vRaccoltaListino(r);
   const tot = S.bambini.length, p = pagatiDi(r).length, inc = incassato(r), sp = speseTot(r);
   const visibili = S.bambini.filter(b => filtroPag === 'tutti' || (filtroPag === 'pagati') === !!r.pagati[b.id]);
   const filtro = (k, t) => `<button aria-pressed="${filtroPag === k}" onclick="A.filtro('${k}')">${t}</button>`;
@@ -105,7 +125,6 @@ function vRaccolta(r) {
       ${avatar(b.nome)}<span class="corpo"><span class="tit">${esc(b.nome)}</span><span class="sub">${stato(b)}</span></span>
       ${r.libera && r.pagati[b.id] ? `<span class="importo">${euro(quotaPagata(r, b.id))}</span>` : ''}
       <span class="spunta">${ic('ok', 'sm')}</span></button>`).join('') || `<p class="muted" style="padding:14px">Nessuno in questa lista.</p>`;
-  const spese = r.spese.map(s => `<tr><td>${esc(s.desc)}</td><td>${euro(s.importo)}<button class="x" aria-label="Togli ${esc(s.desc)}" onclick="A.togliSpesa('${r.id}','${s.id}')">${ic('x', 'sm')}</button></td></tr>`).join('');
   return `${indietro('cassa')}
     <div class="glass card"><div class="dettaglio-eroe">${anello(p, tot, 'var(--sun)', true)}
       <div><h3>${esc(r.titolo)}</h3><p class="muted">${descrizioneQuota(r)}</p>${pillData(r.scadenza)}</div></div>
@@ -115,13 +134,8 @@ function vRaccolta(r) {
     ${titoloSez('Chi ha pagato', `<span class="tenue">tocca per segnare</span>`)}
     <div class="filtri" role="group" aria-label="Filtra">${filtro('tutti', `Tutti ${tot}`)}${filtro('mancano', `Da pagare ${tot - p}`)}${filtro('pagati', `Pagati ${p}`)}</div>
     <div class="glass lista">${righe}</div>
-    ${titoloSez('Spese')}
-    <div class="glass card">${r.spese.length ? `<table class="tabella"><tbody>${spese}<tr class="tot"><td>Totale</td><td>${euro(sp)}</td></tr></tbody></table>` : '<p class="muted">Ancora nessuna spesa. Quando compri qualcosa, segnala qui: il resoconto si fa da solo.</p>'}
-      <div class="fila"><button class="btn vetro" onclick="A.formSpesa('${r.id}')">${ic('scontrino', 'sm')}Aggiungi spesa</button>
-      <button class="btn c-sun" onclick="A.msg('resoconto','${r.id}')">${ic('manda', 'sm')}Resoconto</button></div></div>
-    <div class="fila"><button class="btn vetro" onclick="A.chiudi('raccolte','${r.id}')">${ic(r.chiusa ? 'su' : 'lucchetto', 'sm')}${r.chiusa ? 'Riapri' : 'Chiudi'}</button>
-      <button class="btn vetro" onclick="A.esportaVoce('raccolte','${r.id}')">${ic('giu', 'sm')}Esporta</button>
-      <button class="btn rosso" onclick="A.elimina('raccolte','${r.id}','cassa')">${ic('cestino', 'sm')}Elimina</button></div>`;
+    ${sezSpese(r)}
+    ${sezFondo(r)}`;
 }
 
 /* ---------- AVVISI ---------- */
@@ -251,10 +265,8 @@ async function manda(testo) {
 const MODULI = {
   cassa: (titolo = '') => testaFoglio('cassa', 'c-sun', 'Nuova raccolta') + `<form onsubmit="return A.creaRaccolta(this)">
     <label for="rt">Per cosa?</label><input id="rt" name="titolo" required placeholder="Regalo di Natale maestre" value="${esc(titolo)}">
-    <label class="interruttore" for="ru"><span><b>Stessa cifra per tutti</b><span class="aiuto" id="ru-aiuto">Spegnilo se ognuno paga una cifra diversa (es. fiori, ognuno sceglie il vaso)</span></span>
-      <input id="ru" name="uguale" type="checkbox" role="switch" checked onchange="A.cambiaUguale(this)"></label>
-    <div class="due"><div><label for="rq" id="rq-et">Quota a bambino</label><input id="rq" name="quota" inputmode="decimal" required placeholder="5 €"></div>
-    <div><label for="rs">Entro il</label><input id="rs" name="scadenza" type="date"></div></div>
+    ${campiPagamento(null)}
+    <label for="rs">Entro il</label><input id="rs" name="scadenza" type="date">
     <div class="fila"><button class="btn c-sun pieno">${ic('scintilla', 'sm')}Crea e prepara il messaggio</button></div></form>`,
   avvisi: () => testaFoglio('avviso', 'c-coral', 'Nuovo avviso') + `<form onsubmit="return A.creaAvviso(this)">
     <label for="at">Titolo</label><input id="at" name="titolo" required placeholder="Uscita al museo">
@@ -294,23 +306,17 @@ const A = {
   },
   filtro(k) { filtroPag = k; render(); },
 
-  cambiaUguale(cb) {
-    const quota = $('#rq');
-    $('#rq-et').textContent = cb.checked ? 'Quota a bambino' : 'Cifra indicativa (se vuoi)';
-    quota.required = cb.checked;
-    quota.placeholder = cb.checked ? '5 €' : 'facoltativa';
-  },
   creaRaccolta(f) {
-    const libera = !f.uguale.checked;
-    const quota = numero(f.quota.value);
-    if (!libera && quota <= 0) { toast('Scrivi una quota valida, es. 5'); return false; }
-    const r = { id: uid(), titolo: f.titolo.value.trim(), quota: Math.max(0, quota), libera, scadenza: f.scadenza.value, pagati: {}, spese: [], chiusa: false };
+    const pag = leggiPagamento(f);
+    if (pag.errore) { toast(pag.errore); return false; }
+    const r = { id: uid(), titolo: f.titolo.value.trim(), ...pag, ordini: {}, scadenza: f.scadenza.value, pagati: {}, spese: [], chiusa: false };
     salva({ ...S, raccolte: [...S.raccolte, r] });
     A.vai('cassa', r.id); A.msg('lancioRaccolta', r.id);
     return false;
   },
   paga(rid, bid) {
     const r = trova('raccolte', rid);
+    if (r && conListino(r)) { A.formOrdine(rid, bid); return; }
     if (r && r.libera) { A.formImporto(rid, bid); return; }
     vibra(); ultimoPop = bid;
     aggiorna('raccolte', rid, x => {
@@ -427,7 +433,7 @@ const A = {
       try {
         const dati = JSON.parse(fr.result);
         if (!Array.isArray(dati.bambini)) throw new Error('non è una copia di questa app');
-        if (confirm('Sostituire i dati attuali con quelli della copia?')) { salva({ ...VUOTO, ...dati }, true); toast('Copia caricata'); }
+        if (confirm('Sostituire i dati attuali con quelli della copia?')) { salva(normalizza({ ...VUOTO, ...dati }), true); toast('Copia caricata'); }
       } catch (e) { toast('File non valido: ' + e.message); }
     };
     fr.onerror = () => toast('Non riesco a leggere il file');

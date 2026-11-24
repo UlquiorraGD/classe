@@ -25,6 +25,7 @@ function creaCsv(righe) {
 
 /* ---------- contenuto dei report ---------- */
 function reportRaccolta(r) {
+  if (conListino(r)) return reportListino(r);
   const p = pagatiDi(r).length, inc = incassato(r), sp = speseTot(r);
   const righe = S.bambini.map(b => {
     const v = r.pagati[b.id];
